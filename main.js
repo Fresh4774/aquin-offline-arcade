@@ -231,7 +231,7 @@ class Player extends Entity {
     
     // Draw ship
     ctx.rotate(this.rotation);
-    ctx.rotate(-Math.PI/2);
+    ctx.rotate(Math.PI/2);
     
     if (this.powerup === 'Laser') {
       ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
@@ -1023,7 +1023,7 @@ function drawBackground() {
   const bgWidth = WORLD_WIDTH;
   const bgHeight = WORLD_HEIGHT;
   
-  ctx.fillStyle = 'rgb(10, 10, 30)';
+  ctx.fillStyle = 'rgb(0, 0, 0)';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   
   // Use the star assets instead of simple circles
@@ -1060,35 +1060,6 @@ function drawBackground() {
   }
   
   ctx.globalAlpha = 1.0;
-  
-    // Draw distant nebulae - Adding colorful background gradients
-  const nebulaCount = 5;
-  for (let i = 0; i < nebulaCount; i++) {
-    const x = (i * 733) % bgWidth;
-    const y = (i * 547) % bgHeight;
-    const radius = 300 + (i * 100);
-    
-    const screenX = x - scrollX;
-    const screenY = y - scrollY;
-    
-    // Only draw if partially on screen
-    if (screenX + radius > 0 && screenX - radius < canvas.width &&
-        screenY + radius > 0 && screenY - radius < canvas.height) {
-      
-      const hue = (i * 50) % 360;
-      const gradient = ctx.createRadialGradient(
-        screenX, screenY, 0,
-        screenX, screenY, radius
-      );
-      gradient.addColorStop(0, `hsla(${hue}, 100%, 50%, 0.1)`);
-      gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-      
-      ctx.fillStyle = gradient;
-      ctx.beginPath();
-      ctx.arc(screenX, screenY, radius, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
   
   // Add space stations in the distance (decorative)
   const stationCount = 3;
