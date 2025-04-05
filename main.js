@@ -1019,107 +1019,108 @@ function checkCollisions() {
 }
 
 function drawBackground() {
-  // Draw dark space background
-  const bgWidth = WORLD_WIDTH;
-  const bgHeight = WORLD_HEIGHT;
-  
-  ctx.fillStyle = 'rgb(0, 0, 0)';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  
-  // Use the star assets instead of simple circles
-  const starCount = 400;
-  const starTypes = [
-    { image: images.starTiny, size: 8, count: 200 },
-    { image: images.starSmall, size: 12, count: 100 },
-    { image: images.starMedium, size: 18, count: 70 },
-    { image: images.starLarge, size: 24, count: 30 }
-  ];
-  
-  // Draw each type of star
-  let starIndex = 0;
-  for (const starType of starTypes) {
-    for (let i = 0; i < starType.count; i++) {
-      const x = ((starIndex * 17) + (i * 37)) % bgWidth;
-      const y = ((starIndex * 29) + (i * 53)) % bgHeight;
+    // Draw dark space background
+    const bgWidth = WORLD_WIDTH;
+    const bgHeight = WORLD_HEIGHT;
+    
+    ctx.fillStyle = 'rgb(0, 0, 0)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw grid FIRST (before stars)
+    const gridSize = 200;
+    const gridOpacity = 0.1;
+    
+    const startX = Math.floor(scrollX / gridSize) * gridSize;
+    const startY = Math.floor(scrollY / gridSize) * gridSize;
+    const endX = Math.ceil((scrollX + canvas.width) / gridSize) * gridSize;
+    const endY = Math.ceil((scrollY + canvas.height) / gridSize) * gridSize;
+    
+    ctx.strokeStyle = `rgba(39, 39, 42)`;
+    ctx.lineWidth = 1;
+    
+    // Vertical lines
+    for (let x = startX; x <= endX; x += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(x - scrollX, 0);
+      ctx.lineTo(x - scrollX, canvas.height);
+      ctx.stroke();
+    }
+    
+    // Horizontal lines
+    for (let y = startY; y <= endY; y += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(0, y - scrollY);
+      ctx.lineTo(canvas.width, y - scrollY);
+      ctx.stroke();
+    }
+    
+    // AFTER grid, draw stars and other background elements
+    // Use the star assets instead of simple circles
+    const starCount = 400;
+    const starTypes = [
+      { image: images.starTiny, size: 8, count: 200 },
+      { image: images.starSmall, size: 12, count: 100 },
+      { image: images.starMedium, size: 18, count: 70 },
+      { image: images.starLarge, size: 24, count: 30 }
+    ];
+    
+    // Draw each type of star
+    let starIndex = 0;
+    for (const starType of starTypes) {
+      for (let i = 0; i < starType.count; i++) {
+        const x = ((starIndex * 17) + (i * 37)) % bgWidth;
+        const y = ((starIndex * 29) + (i * 53)) % bgHeight;
+        
+        const screenX = x - scrollX;
+        const screenY = y - scrollY;
+        
+        // Only draw if on screen (with margin)
+        if (screenX > -starType.size && screenX < canvas.width + starType.size &&
+            screenY > -starType.size && screenY < canvas.height + starType.size) {
+          
+          const brightness = (Math.sin(gameTime / 1000 + i) + 1) * 0.3 + 0.7;
+          ctx.globalAlpha = brightness;
+          
+          const size = starType.size * brightness;
+          ctx.drawImage(starType.image, screenX - size/2, screenY - size/2, size, size);
+        }
+        starIndex++;
+      }
+    }
+    
+    ctx.globalAlpha = 1.0;
+    
+    // Add space stations in the distance (decorative)
+    const stationCount = 3;
+    for (let i = 0; i < stationCount; i++) {
+      const x = (i * 977) % bgWidth;
+      const y = (i * 887) % bgHeight;
       
       const screenX = x - scrollX;
       const screenY = y - scrollY;
       
-      // Only draw if on screen (with margin)
-      if (screenX > -starType.size && screenX < canvas.width + starType.size &&
-          screenY > -starType.size && screenY < canvas.height + starType.size) {
+      // Only draw if on screen
+      if (screenX > -100 && screenX < canvas.width + 100 &&
+          screenY > -100 && screenY < canvas.height + 100) {
         
-        const brightness = (Math.sin(gameTime / 1000 + i) + 1) * 0.3 + 0.7;
-        ctx.globalAlpha = brightness;
+        ctx.save();
+        ctx.translate(screenX, screenY);
+        ctx.rotate(i * Math.PI / 4);
         
-        const size = starType.size * brightness;
-        ctx.drawImage(starType.image, screenX - size/2, screenY - size/2, size, size);
+        // Draw with a slight transparency to make it look distant
+        ctx.globalAlpha = 0.6;
+        ctx.drawImage(images.station, -80, -80, 160, 160);
+        ctx.globalAlpha = 1.0;
+        
+        ctx.restore();
       }
-      starIndex++;
     }
-  }
-  
-  ctx.globalAlpha = 1.0;
-  
-  // Add space stations in the distance (decorative)
-  const stationCount = 3;
-  for (let i = 0; i < stationCount; i++) {
-    const x = (i * 977) % bgWidth;
-    const y = (i * 887) % bgHeight;
     
-    const screenX = x - scrollX;
-    const screenY = y - scrollY;
-    
-    // Only draw if on screen
-    if (screenX > -100 && screenX < canvas.width + 100 &&
-        screenY > -100 && screenY < canvas.height + 100) {
-      
-      ctx.save();
-      ctx.translate(screenX, screenY);
-      ctx.rotate(i * Math.PI / 4);
-      
-      // Draw with a slight transparency to make it look distant
-      ctx.globalAlpha = 0.6;
-      ctx.drawImage(images.station, -80, -80, 160, 160);
-      ctx.globalAlpha = 1.0;
-      
-      ctx.restore();
-    }
+    // Draw world boundaries last
+    ctx.strokeStyle = 'rgba(255, 0, 0, 0.3)';
+    ctx.lineWidth = 5;
+    ctx.strokeRect(-scrollX, -scrollY, WORLD_WIDTH, WORLD_HEIGHT);
   }
-  
-  // Draw grid
-  const gridSize = 200;
-  const gridOpacity = 0.1;
-  
-  const startX = Math.floor(scrollX / gridSize) * gridSize;
-  const startY = Math.floor(scrollY / gridSize) * gridSize;
-  const endX = Math.ceil((scrollX + canvas.width) / gridSize) * gridSize;
-  const endY = Math.ceil((scrollY + canvas.height) / gridSize) * gridSize;
-  
-  ctx.strokeStyle = `rgba(100, 100, 255, ${gridOpacity})`;
-  ctx.lineWidth = 1;
-  
-  // Vertical lines
-  for (let x = startX; x <= endX; x += gridSize) {
-    ctx.beginPath();
-    ctx.moveTo(x - scrollX, 0);
-    ctx.lineTo(x - scrollX, canvas.height);
-    ctx.stroke();
-  }
-  
-  // Horizontal lines
-  for (let y = startY; y <= endY; y += gridSize) {
-    ctx.beginPath();
-    ctx.moveTo(0, y - scrollY);
-    ctx.lineTo(canvas.width, y - scrollY);
-    ctx.stroke();
-  }
-  
-  // Draw world boundaries
-  ctx.strokeStyle = 'rgba(255, 0, 0, 0.3)';
-  ctx.lineWidth = 5;
-  ctx.strokeRect(-scrollX, -scrollY, WORLD_WIDTH, WORLD_HEIGHT);
-}
 
 function drawMinimap() {
   const mapSize = 150;
