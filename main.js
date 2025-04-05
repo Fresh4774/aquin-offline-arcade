@@ -329,9 +329,27 @@ class Bullet extends Entity {
     this.vy = vy;
     this.lifespan = 2000; // 2 seconds
     this.color = color;
+    
+    // Store previous positions for trail effect
+    this.trailPositions = [];
+    this.trailLength = 8; // Number of trail segments
+    
+    // Calculate the angle of movement
+    this.angle = Math.atan2(vy, vx);
+    
+    // Store original radius for reference
+    this.originalRadius = radius;
   }
   
   update(deltaTime) {
+    // Store current position for trail
+    this.trailPositions.unshift({x: this.x, y: this.y});
+    
+    // Limit trail length
+    if (this.trailPositions.length > this.trailLength) {
+      this.trailPositions.pop();
+    }
+    
     this.x += this.vx;
     this.y += this.vy;
     
@@ -350,22 +368,79 @@ class Bullet extends Entity {
     const screenPos = this.worldToScreen(this.x, this.y);
     
     ctx.save();
-    ctx.beginPath();
-    ctx.arc(screenPos.x, screenPos.y, this.radius, 0, Math.PI * 2);
-    ctx.fillStyle = this.color;
-    ctx.fill();
     
-    // Draw glow effect
-    const gradient = ctx.createRadialGradient(
-      screenPos.x, screenPos.y, 0,
-      screenPos.x, screenPos.y, this.radius * 2
-    );
-    gradient.addColorStop(0, this.color);
+    // Draw the trail
+    for (let i = 0; i < this.trailPositions.length; i++) {
+      const pos = this.trailPositions[i];
+      const trailPos = this.worldToScreen(pos.x, pos.y);
+      
+      // Calculate trail segment opacity and size (fading toward the end of the trail)
+      const opacity = 1 - (i / this.trailPositions.length);
+      const segmentRadius = this.originalRadius * (1 - (i / this.trailPositions.length) * 0.7);
+      
+      // Draw trail segment with reducing opacity
+      ctx.globalAlpha = opacity * 0.5;
+      
+      // Different trail appearance based on bullet type
+      if (this.color === 'red') {
+        ctx.fillStyle = `rgba(255, 50, 50, ${opacity * 0.7})`;
+      } else {
+        ctx.fillStyle = `rgba(200, 240, 255, ${opacity * 0.7})`;
+      }
+      
+      ctx.beginPath();
+      ctx.arc(trailPos.x, trailPos.y, segmentRadius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    
+    // Reset global alpha
+    ctx.globalAlpha = 1.0;
+    
+    // Draw the main bullet as an elongated shape
+    ctx.translate(screenPos.x, screenPos.y);
+    ctx.rotate(this.angle);
+    
+    // Create gradient for the elongated bullet
+    const bulletLength = this.originalRadius * 3;
+    const bulletWidth = this.originalRadius * 0.8;
+    
+    let gradientColor;
+    if (this.color === 'red') {
+      gradientColor = 'rgba(255, 50, 50, 0.9)';
+    } else if (this.color === 'white') {
+      gradientColor = 'rgba(200, 240, 255, 0.9)';
+    } else {
+      gradientColor = this.color;
+    }
+    
+    const gradient = ctx.createLinearGradient(-bulletLength, 0, bulletLength, 0);
+    gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    gradient.addColorStop(0.2, gradientColor);
+    gradient.addColorStop(0.8, gradientColor);
     gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
     
-    ctx.beginPath();
-    ctx.arc(screenPos.x, screenPos.y, this.radius * 2, 0, Math.PI * 2);
+    // Draw elongated bullet
     ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, bulletLength, bulletWidth, 0, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Add a glow effect
+    const glowGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, bulletWidth * 3);
+    
+    if (this.color === 'red') {
+      glowGradient.addColorStop(0, 'rgba(255, 100, 50, 0.8)');
+      glowGradient.addColorStop(0.5, 'rgba(255, 50, 20, 0.4)');
+    } else {
+      glowGradient.addColorStop(0, 'rgba(200, 240, 255, 0.8)');
+      glowGradient.addColorStop(0.5, 'rgba(100, 200, 255, 0.4)');
+    }
+    
+    glowGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    
+    ctx.fillStyle = glowGradient;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, bulletLength * 0.8, bulletWidth * 2, 0, 0, Math.PI * 2);
     ctx.fill();
     
     ctx.restore();
@@ -1091,7 +1166,7 @@ function drawBackground() {
     ctx.globalAlpha = 1.0;
     
     // Add space stations in the distance (decorative)
-    const stationCount = 3;
+    const stationCount = 8;
     for (let i = 0; i < stationCount; i++) {
       const x = (i * 977) % bgWidth;
       const y = (i * 887) % bgHeight;
@@ -1117,7 +1192,7 @@ function drawBackground() {
     }
     
     // Draw world boundaries last
-    ctx.strokeStyle = 'rgba(255, 0, 0, 0.3)';
+    ctx.strokeStyle = 'rgba(0, 0, 0)';
     ctx.lineWidth = 5;
     ctx.strokeRect(-scrollX, -scrollY, WORLD_WIDTH, WORLD_HEIGHT);
   }
