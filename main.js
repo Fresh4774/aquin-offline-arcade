@@ -78,6 +78,14 @@ let clones = [];
 const keys = {};
 const mousePos = { x: 0, y: 0 };
 
+// Track key press timers globally
+const keyPressTimers = {
+  'w': { lastPress: 0, boostActive: false },
+  's': { lastPress: 0, boostActive: false },
+  'a': { lastPress: 0, boostActive: false },
+  'd': { lastPress: 0, boostActive: false }
+};
+
 window.addEventListener('keydown', (e) => {
   // Normalize key names to lowercase and handle arrow keys
   let key = e.key.toLowerCase();
@@ -93,6 +101,22 @@ window.addEventListener('keydown', (e) => {
   // If it's an arrow key, use the mapped WASD key
   if (keyMap[key]) {
     key = keyMap[key];
+  }
+  
+  // Check for double-press speed boost
+  if (keyPressTimers[key]) {
+    const currentTime = performance.now();
+    
+    // If pressed again within 300ms, activate boost
+    if (currentTime - keyPressTimers[key].lastPress < 300) {
+      keyPressTimers[key].boostActive = true;
+      
+      // Log boost activation (optional, for debugging)
+      console.log(`Speed boost activated for ${key}`);
+    }
+    
+    // Update last press time
+    keyPressTimers[key].lastPress = currentTime;
   }
   
   keys[key] = true;
@@ -113,6 +137,13 @@ window.addEventListener('keyup', (e) => {
   // If it's an arrow key, use the mapped WASD key
   if (keyMap[key]) {
     key = keyMap[key];
+  }
+  
+  // Reset boost state when key is released if no longer pressed
+  if (keyPressTimers[key]) {
+    if (!keys[key]) {
+      keyPressTimers[key].boostActive = false;
+    }
   }
   
   keys[key] = false;
@@ -169,6 +200,7 @@ class Player extends Entity {
     this.velocity = { x: 0, y: 0 };
     this.acceleration = 0.5;
     this.maxSpeed = 5;
+    this.boostMaxSpeed = 8; // Higher max speed during boost
     this.health = 100;
     this.shootCooldown = 0;
     this.invulnerable = false;
@@ -179,9 +211,15 @@ class Player extends Entity {
     this.cloneOffset = { x: 0, y: 0 };
     this.bombReady = false;
     this.bombUses = 0; // Track bomb uses
+    this.boostCooldown = 0;
   }
   
   update(deltaTime) {
+    // Manage boost cooldown
+    if (this.boostCooldown > 0) {
+      this.boostCooldown -= deltaTime;
+    }
+    
     if (this.isClone) {
       // Clone behavior - actively follow the player with offset and potentially despawn
       if (player) {
@@ -226,28 +264,57 @@ class Player extends Entity {
       this.rotation = Math.atan2(dy, dx);
       
       // Movement
-      if (keys['w'] || keys['arrowup']) {
-        this.velocity.x += Math.cos(this.rotation) * this.acceleration;
-        this.velocity.y += Math.sin(this.rotation) * this.acceleration;
+      const movementBoost = (key) => {
+        // Check if boost is active and cooldown is not in effect
+        return this.boostCooldown <= 0 && keyPressTimers[key] && keyPressTimers[key].boostActive;
+      };
+      
+      if (keys['w']) {
+        this.velocity.x += Math.cos(this.rotation) * this.acceleration * (movementBoost('w') ? 1.5 : 1);
+        this.velocity.y += Math.sin(this.rotation) * this.acceleration * (movementBoost('w') ? 1.5 : 1);
+        
+        // Activate boost and set cooldown if boosted
+        if (movementBoost('w')) {
+          this.boostCooldown = 1000;
+          keyPressTimers['w'].boostActive = false;
+        }
       }
       
-      if (keys['s'] || keys['arrowdown']) {
-        this.velocity.x -= Math.cos(this.rotation) * this.acceleration * 0.5;
-        this.velocity.y -= Math.sin(this.rotation) * this.acceleration * 0.5;
+      if (keys['s']) {
+        this.velocity.x -= Math.cos(this.rotation) * this.acceleration * 0.5 * (movementBoost('s') ? 1.5 : 1);
+        this.velocity.y -= Math.sin(this.rotation) * this.acceleration * 0.5 * (movementBoost('s') ? 1.5 : 1);
+        
+        // Activate boost and set cooldown if boosted
+        if (movementBoost('s')) {
+          this.boostCooldown = 1000;
+          keyPressTimers['s'].boostActive = false;
+        }
       }
       
       // Strafing
-      if (keys['a'] || keys['arrowleft']) {
-        this.velocity.x += Math.cos(this.rotation - Math.PI/2) * this.acceleration * 0.7;
-        this.velocity.y += Math.sin(this.rotation - Math.PI/2) * this.acceleration * 0.7;
+      if (keys['a']) {
+        this.velocity.x += Math.cos(this.rotation - Math.PI/2) * this.acceleration * 0.7 * (movementBoost('a') ? 1.5 : 1);
+        this.velocity.y += Math.sin(this.rotation - Math.PI/2) * this.acceleration * 0.7 * (movementBoost('a') ? 1.5 : 1);
+        
+        // Activate boost and set cooldown if boosted
+        if (movementBoost('a')) {
+          this.boostCooldown = 1000;
+          keyPressTimers['a'].boostActive = false;
+        }
       }
       
-      if (keys['d'] || keys['arrowright']) {
-        this.velocity.x += Math.cos(this.rotation + Math.PI/2) * this.acceleration * 0.7;
-        this.velocity.y += Math.sin(this.rotation + Math.PI/2) * this.acceleration * 0.7;
+      if (keys['d']) {
+        this.velocity.x += Math.cos(this.rotation + Math.PI/2) * this.acceleration * 0.7 * (movementBoost('d') ? 1.5 : 1);
+        this.velocity.y += Math.sin(this.rotation + Math.PI/2) * this.acceleration * 0.7 * (movementBoost('d') ? 1.5 : 1);
+        
+        // Activate boost and set cooldown if boosted
+        if (movementBoost('d')) {
+          this.boostCooldown = 1000;
+          keyPressTimers['d'].boostActive = false;
+        }
       }
       
-      // Activate bomb on right-click if bomb is ready
+      // Activate bomb on space
       if ((keys[' ']) && this.bombReady && this.bombUses > 0) {
         this.activateBomb();
         this.bombUses--;
@@ -268,9 +335,11 @@ class Player extends Entity {
     
     // Limit speed
     const speed = Math.sqrt(this.velocity.x * this.velocity.x + this.velocity.y * this.velocity.y);
-    if (speed > this.maxSpeed) {
-      this.velocity.x = (this.velocity.x / speed) * this.maxSpeed;
-      this.velocity.y = (this.velocity.y / speed) * this.maxSpeed;
+    const currentMaxSpeed = this.boostCooldown > 0 ? this.boostMaxSpeed : this.maxSpeed;
+    
+    if (speed > currentMaxSpeed) {
+      this.velocity.x = (this.velocity.x / speed) * currentMaxSpeed;
+      this.velocity.y = (this.velocity.y / speed) * currentMaxSpeed;
     }
     
     // Apply friction
@@ -297,6 +366,7 @@ class Player extends Entity {
     // Update powerup
     if (this.powerup) {
       this.powerupTime -= deltaTime;
+      
       if (!this.isClone) {
         if (this.powerup === "Bomb") {
           powerupIndicator.textContent = `${this.powerup} (${this.bombUses} uses)`;
@@ -334,7 +404,7 @@ class Player extends Entity {
       ctx.stroke();
     }
     
-    // Draw ship
+    // Rotate the ship
     ctx.rotate(this.rotation);
     ctx.rotate(Math.PI/2);
     
@@ -358,6 +428,14 @@ class Player extends Entity {
       ctx.fillStyle = 'rgba(20, 184, 166, 0.3)';
       ctx.beginPath();
       ctx.arc(0, 0, this.radius + 8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    
+    // Boost visual indicator
+    if (this.boostCooldown > 0) {
+      ctx.fillStyle = 'rgba(255, 255, 0, 0.3)';
+      ctx.beginPath();
+      ctx.arc(0, 0, this.radius + 12, 0, Math.PI * 2);
       ctx.fill();
     }
     
@@ -465,7 +543,7 @@ class Player extends Entity {
       powerupIndicator.textContent = `Bomb (5 uses)`;
     }
     else if (type === 'Clones') {
-      this.powerupTime = 15000; // 20 seconds
+      this.powerupTime = 15000; // 15 seconds
       powerupIndicator.textContent = `${type} (15s)`;
       this.spawnClones();
     }
@@ -485,7 +563,7 @@ class Player extends Entity {
     for (let i = 0; i < 3; i++) {
       const clone = new Player(this.x, this.y, true);
       clone.cloneOffset = offsetConfigs[i];
-      clone.powerupTime = 20000;
+      clone.powerupTime = 15000;
       clones.push(clone);
       
       // Create spawn effect particles
