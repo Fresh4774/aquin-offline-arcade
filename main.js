@@ -29,14 +29,25 @@ const WORLD_HEIGHT = 3000;
 // Image loading
 const images = {};
 const imageFiles = {
-  ship: 'PNG/Sprites/Ships/spaceShips_008.png',
-  asteroid: 'PNG/Sprites/Meteors/spaceMeteors_004.png',
-  smallAsteroid: 'PNG/Sprites/Meteors/spaceMeteors_001.png',
-  enemy1: 'PNG/Sprites/Ships/spaceShips_001.png',
-  enemy2: 'PNG/Sprites/Ships/spaceShips_005.png',
-  satellite: 'PNG/Sprites/Ships/spaceShips_006.png',
-  powerupLaser: 'PNG/Sprites/Ships/spaceShips_009.png',
-  powerupShield: 'PNG/Sprites/Ships/spaceShips_007.png'
+  ship: 'PNG/ship_F.png',
+  asteroid: 'PNG/meteor_detailedLarge.png',
+  smallAsteroid: 'PNG/meteor_detailedSmall.png',
+  enemy1: 'PNG/enemy_A.png',
+  enemy2: 'PNG/enemy_C.png',
+  enemy3: 'PNG/enemy_B.png',
+  enemy4: 'PNG/enemy_D.png',
+  enemy5: 'PNG/enemy_E.png',
+  satellite1: 'PNG/satellite_A.png',
+  satellite2: 'PNG/satellite_B.png',
+  satellite3: 'PNG/satellite_C.png',
+  satellite4: 'PNG/satellite_D.png',
+  powerupLaser: 'PNG/effect_yellow.png',
+  powerupShield: 'PNG/effect_purple.png',
+  station: 'PNG/station_A.png',
+  starLarge: 'PNG/star_large.png',
+  starMedium: 'PNG/star_medium.png',
+  starSmall: 'PNG/star_small.png',
+  starTiny: 'PNG/star_tiny.png'
 };
 
 let imagesLoaded = 0;
@@ -416,15 +427,20 @@ class Asteroid extends Entity {
   split() {
     // Only split if this is a large asteroid
     if (this.radius > 25) {
+      // Create different types of small asteroids
+      const smallAsteroidTypes = ['meteor_small', 'meteor_squareSmall', 'meteor_squareDetailedSmall'];
+      
       for (let i = 0; i < 3; i++) {
-        asteroids.push(new Asteroid(
+        const asteroid = new Asteroid(
           this.x + (Math.random() - 0.5) * 20,
           this.y + (Math.random() - 0.5) * 20,
           15,
           3,
           (Math.random() - 0.5) * 0.05,
           1
-        ));
+        );
+        asteroid.image = images.smallAsteroid;
+        asteroids.push(asteroid);
       }
       
       // Create explosion particles
@@ -462,7 +478,17 @@ class Enemy extends Entity {
     this.shootCooldown = 0;
     this.shootRate = type === 'large' ? 2000 : 3000; // milliseconds
     this.rotation = 0;
-    this.image = type === 'large' ? images.enemy2 : images.enemy1;
+    
+    // Select enemy image based on type
+    if (type === 'large') {
+      // Randomly choose between enemy2 and enemy4 for large enemies
+      this.image = Math.random() < 0.5 ? images.enemy2 : images.enemy4;
+    } else {
+      // Randomly choose between enemy1, enemy3, and enemy5 for normal enemies
+      const normalEnemyTypes = [images.enemy1, images.enemy3, images.enemy5];
+      this.image = normalEnemyTypes[Math.floor(Math.random() * normalEnemyTypes.length)];
+    }
+    
     this.targetingOffset = {
       x: (Math.random() - 0.5) * 100,
       y: (Math.random() - 0.5) * 100
@@ -630,6 +656,10 @@ class Satellite extends Entity {
     this.collected = false;
     this.blinkTimer = 0;
     this.visible = true;
+    
+    // Randomly choose one of the satellite types
+    const satelliteTypes = ['satellite1', 'satellite2', 'satellite3', 'satellite4'];
+    this.image = images[satelliteTypes[Math.floor(Math.random() * satelliteTypes.length)]];
   }
   
   update(deltaTime) {
@@ -675,7 +705,7 @@ class Satellite extends Entity {
     ctx.translate(screenPos.x, screenPos.y);
     ctx.rotate(this.rotation);
     
-    ctx.drawImage(images.satellite, -20, -20, 40, 40);
+    ctx.drawImage(this.image, -20, -20, 40, 40);
     
     // Draw glow effect
     ctx.beginPath();
@@ -697,6 +727,10 @@ class Powerup extends Entity {
     this.image = type === 'Laser' ? images.powerupLaser : images.powerupShield;
     this.pulseTimer = 0;
     this.pulseSize = 0;
+    
+    // Add a floating effect
+    this.floatTimer = 0;
+    this.floatOffset = 0;
   }
   
   update(deltaTime) {
@@ -706,6 +740,10 @@ class Powerup extends Entity {
     // Pulse effect
     this.pulseTimer += deltaTime;
     this.pulseSize = Math.sin(this.pulseTimer / 200) * 5;
+    
+    // Floating effect
+    this.floatTimer += deltaTime;
+    this.floatOffset = Math.sin(this.floatTimer / 500) * 3;
     
     if (this.lifespan <= 0) {
       this.markedForDeletion = true;
@@ -734,17 +772,17 @@ class Powerup extends Entity {
     const screenPos = this.worldToScreen(this.x, this.y);
     
     ctx.save();
-    ctx.translate(screenPos.x, screenPos.y);
+    ctx.translate(screenPos.x, screenPos.y + this.floatOffset);
     ctx.rotate(this.rotation);
     
     // Draw glow effect
-    const color = this.type === 'Laser' ? 'rgba(255, 0, 0, 0.3)' : 'rgba(0, 255, 255, 0.3)';
+    const color = this.type === 'Laser' ? 'rgba(255, 200, 0, 0.3)' : 'rgba(200, 0, 255, 0.3)';
     ctx.beginPath();
     ctx.arc(0, 0, 20 + this.pulseSize, 0, Math.PI * 2);
     ctx.fillStyle = color;
     ctx.fill();
     
-    ctx.drawImage(this.image, -15, -15, 30, 30);
+    ctx.drawImage(this.image, -20, -20, 40, 40);
     
     ctx.restore();
     
@@ -753,7 +791,7 @@ class Powerup extends Entity {
       const opacity = this.lifespan / 3000;
       ctx.fillStyle = `rgba(255, 255, 255, ${opacity * 0.5})`;
       ctx.beginPath();
-      ctx.arc(screenPos.x, screenPos.y, 20, 0, Math.PI * 2);
+      ctx.arc(screenPos.x, screenPos.y + this.floatOffset, 20, 0, Math.PI * 2);
       ctx.fill();
     }
   }
@@ -981,38 +1019,49 @@ function checkCollisions() {
 }
 
 function drawBackground() {
-  // Draw stars
-  const starCount = 1000;
-  const starRadius = 1;
+  // Draw dark space background
   const bgWidth = WORLD_WIDTH;
   const bgHeight = WORLD_HEIGHT;
   
   ctx.fillStyle = 'rgb(10, 10, 30)';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   
-  // Use a deterministic pattern for stars
-  for (let i = 0; i < starCount; i++) {
-    const x = (i * 17) % bgWidth;
-    const y = (i * 29) % bgHeight;
-    
-    const screenX = x - scrollX;
-    const screenY = y - scrollY;
-    
-    // Only draw if on screen
-    if (screenX > -starRadius && screenX < canvas.width + starRadius &&
-        screenY > -starRadius && screenY < canvas.height + starRadius) {
+  // Use the star assets instead of simple circles
+  const starCount = 400;
+  const starTypes = [
+    { image: images.starTiny, size: 8, count: 200 },
+    { image: images.starSmall, size: 12, count: 100 },
+    { image: images.starMedium, size: 18, count: 70 },
+    { image: images.starLarge, size: 24, count: 30 }
+  ];
+  
+  // Draw each type of star
+  let starIndex = 0;
+  for (const starType of starTypes) {
+    for (let i = 0; i < starType.count; i++) {
+      const x = ((starIndex * 17) + (i * 37)) % bgWidth;
+      const y = ((starIndex * 29) + (i * 53)) % bgHeight;
       
-      const brightness = (Math.sin(gameTime / 1000 + i) + 1) * 0.5 * 0.3 + 0.7;
-      const size = ((i % 3) + 1) * brightness;
+      const screenX = x - scrollX;
+      const screenY = y - scrollY;
       
-      ctx.fillStyle = `rgba(255, 255, 255, ${brightness})`;
-      ctx.beginPath();
-      ctx.arc(screenX, screenY, size, 0, Math.PI * 2);
-      ctx.fill();
+      // Only draw if on screen (with margin)
+      if (screenX > -starType.size && screenX < canvas.width + starType.size &&
+          screenY > -starType.size && screenY < canvas.height + starType.size) {
+        
+        const brightness = (Math.sin(gameTime / 1000 + i) + 1) * 0.3 + 0.7;
+        ctx.globalAlpha = brightness;
+        
+        const size = starType.size * brightness;
+        ctx.drawImage(starType.image, screenX - size/2, screenY - size/2, size, size);
+      }
+      starIndex++;
     }
   }
   
-  // Draw distant nebulae - Adding colorful background gradients
+  ctx.globalAlpha = 1.0;
+  
+    // Draw distant nebulae - Adding colorful background gradients
   const nebulaCount = 5;
   for (let i = 0; i < nebulaCount; i++) {
     const x = (i * 733) % bgWidth;
@@ -1038,6 +1087,32 @@ function drawBackground() {
       ctx.beginPath();
       ctx.arc(screenX, screenY, radius, 0, Math.PI * 2);
       ctx.fill();
+    }
+  }
+  
+  // Add space stations in the distance (decorative)
+  const stationCount = 3;
+  for (let i = 0; i < stationCount; i++) {
+    const x = (i * 977) % bgWidth;
+    const y = (i * 887) % bgHeight;
+    
+    const screenX = x - scrollX;
+    const screenY = y - scrollY;
+    
+    // Only draw if on screen
+    if (screenX > -100 && screenX < canvas.width + 100 &&
+        screenY > -100 && screenY < canvas.height + 100) {
+      
+      ctx.save();
+      ctx.translate(screenX, screenY);
+      ctx.rotate(i * Math.PI / 4);
+      
+      // Draw with a slight transparency to make it look distant
+      ctx.globalAlpha = 0.6;
+      ctx.drawImage(images.station, -80, -80, 160, 160);
+      ctx.globalAlpha = 1.0;
+      
+      ctx.restore();
     }
   }
   
