@@ -41,8 +41,6 @@ const imageFiles = {
   satellite2: 'PNG/satellite_B.png',
   satellite3: 'PNG/satellite_C.png',
   satellite4: 'PNG/satellite_D.png',
-  powerupLaser: 'PNG/effect_yellow.png',
-  powerupShield: 'PNG/effect_purple.png',
   station: 'PNG/station_A.png',
   starLarge: 'PNG/star_large.png',
   starMedium: 'PNG/star_medium.png',
@@ -74,6 +72,7 @@ let enemies = [];
 let satellites = [];
 let powerups = [];
 let particles = [];
+let clones = [];
 
 // Input handlers
 const keys = {};
@@ -132,7 +131,7 @@ class Entity {
 }
 
 class Player extends Entity {
-  constructor(x, y) {
+  constructor(x, y, isClone = false) {
     super(x, y, 20);
     this.rotation = 0;
     this.velocity = { x: 0, y: 0 };
@@ -144,35 +143,76 @@ class Player extends Entity {
     this.invulnerableTime = 0;
     this.powerup = null;
     this.powerupTime = 0;
+    this.isClone = isClone;
+    this.cloneOffset = { x: 0, y: 0 };
+    this.bombReady = false;
   }
   
   update(deltaTime) {
-    // Update rotation based on mouse position
-    const screenPos = this.worldToScreen(this.x, this.y);
-    const dx = mousePos.x - screenPos.x;
-    const dy = mousePos.y - screenPos.y;
-    this.rotation = Math.atan2(dy, dx);
-    
-    // Movement
-    if (keys['w'] || keys['arrowup']) {
-      this.velocity.x += Math.cos(this.rotation) * this.acceleration;
-      this.velocity.y += Math.sin(this.rotation) * this.acceleration;
-    }
-    
-    if (keys['s'] || keys['arrowdown']) {
-      this.velocity.x -= Math.cos(this.rotation) * this.acceleration * 0.5;
-      this.velocity.y -= Math.sin(this.rotation) * this.acceleration * 0.5;
-    }
-    
-    // Strafing
-    if (keys['a'] || keys['arrowleft']) {
-      this.velocity.x += Math.cos(this.rotation - Math.PI/2) * this.acceleration * 0.7;
-      this.velocity.y += Math.sin(this.rotation - Math.PI/2) * this.acceleration * 0.7;
-    }
-    
-    if (keys['d'] || keys['arrowright']) {
-      this.velocity.x += Math.cos(this.rotation + Math.PI/2) * this.acceleration * 0.7;
-      this.velocity.y += Math.sin(this.rotation + Math.PI/2) * this.acceleration * 0.7;
+    if (this.isClone) {
+      // Clone behavior - follow the player with offset
+      if (player) {
+        // Calculate target position based on player position and offset
+        const targetX = player.x + this.cloneOffset.x;
+        const targetY = player.y + this.cloneOffset.y;
+        
+        // Move smoothly toward target position
+        const dx = targetX - this.x;
+        const dy = targetY - this.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        if (dist > 5) {
+          this.velocity.x = dx * 0.1;
+          this.velocity.y = dy * 0.1;
+        } else {
+          this.velocity.x *= 0.9;
+          this.velocity.y *= 0.9;
+        }
+        
+        // Match player's rotation
+        this.rotation = player.rotation;
+        
+        // Auto-shoot
+        if (this.shootCooldown <= 0) {
+          this.shoot();
+          this.shootCooldown = 500; // Slower fire rate than player
+        }
+      }
+    } else {
+      // Regular player behavior
+      // Update rotation based on mouse position
+      const screenPos = this.worldToScreen(this.x, this.y);
+      const dx = mousePos.x - screenPos.x;
+      const dy = mousePos.y - screenPos.y;
+      this.rotation = Math.atan2(dy, dx);
+      
+      // Movement
+      if (keys['w'] || keys['arrowup']) {
+        this.velocity.x += Math.cos(this.rotation) * this.acceleration;
+        this.velocity.y += Math.sin(this.rotation) * this.acceleration;
+      }
+      
+      if (keys['s'] || keys['arrowdown']) {
+        this.velocity.x -= Math.cos(this.rotation) * this.acceleration * 0.5;
+        this.velocity.y -= Math.sin(this.rotation) * this.acceleration * 0.5;
+      }
+      
+      // Strafing
+      if (keys['a'] || keys['arrowleft']) {
+        this.velocity.x += Math.cos(this.rotation - Math.PI/2) * this.acceleration * 0.7;
+        this.velocity.y += Math.sin(this.rotation - Math.PI/2) * this.acceleration * 0.7;
+      }
+      
+      if (keys['d'] || keys['arrowright']) {
+        this.velocity.x += Math.cos(this.rotation + Math.PI/2) * this.acceleration * 0.7;
+        this.velocity.y += Math.sin(this.rotation + Math.PI/2) * this.acceleration * 0.7;
+      }
+      
+      // Activate bomb if space key is pressed and bomb is ready
+      if (keys[' '] && this.bombReady) {
+        this.activateBomb();
+        this.bombReady = false;
+      }
     }
     
     // Limit speed
@@ -206,10 +246,18 @@ class Player extends Entity {
     // Update powerup
     if (this.powerup) {
       this.powerupTime -= deltaTime;
-      powerupIndicator.textContent = `${this.powerup} (${Math.ceil(this.powerupTime / 1000)}s)`;
+      if (!this.isClone) {
+        if (this.powerup === "Bomb") {
+          powerupIndicator.textContent = `${this.powerup} (Press SPACE)`;
+        } else {
+          powerupIndicator.textContent = `${this.powerup} (${Math.ceil(this.powerupTime / 1000)}s)`;
+        }
+      }
       if (this.powerupTime <= 0) {
         this.powerup = null;
-        powerupIndicator.textContent = '';
+        if (!this.isClone) {
+          powerupIndicator.textContent = '';
+        }
       }
     }
   }
@@ -233,6 +281,7 @@ class Player extends Entity {
     ctx.rotate(this.rotation);
     ctx.rotate(Math.PI/2);
     
+    // Power-up visual effects
     if (this.powerup === 'Laser') {
       ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
       ctx.beginPath();
@@ -243,9 +292,25 @@ class Player extends Entity {
       ctx.beginPath();
       ctx.arc(0, 0, this.radius + 8, 0, Math.PI * 2);
       ctx.fill();
+    } else if (this.powerup === 'Bomb') {
+      ctx.fillStyle = 'rgba(255, 0, 255, 0.3)';
+      ctx.beginPath();
+      ctx.arc(0, 0, this.radius + 8, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (this.powerup === 'Clones') {
+      ctx.fillStyle = 'rgba(0, 100, 255, 0.3)';
+      ctx.beginPath();
+      ctx.arc(0, 0, this.radius + 8, 0, Math.PI * 2);
+      ctx.fill();
     }
     
-    ctx.drawImage(images.ship, -25, -25, 50, 50);
+    // Draw the ship with slight transparency for clones
+    if (this.isClone) {
+      ctx.globalAlpha = 0.7;
+      ctx.drawImage(images.ship, -25, -25, 50, 50);
+    } else {
+      ctx.drawImage(images.ship, -25, -25, 50, 50);
+    }
     
     ctx.restore();
   }
@@ -312,13 +377,118 @@ class Player extends Entity {
   
   applyPowerup(type) {
     this.powerup = type;
-    this.powerupTime = 15000; // 15 seconds
-    powerupIndicator.textContent = `${type} (15s)`;
     
     if (type === 'Shield') {
+      this.powerupTime = 15000; // 15 seconds
+      powerupIndicator.textContent = `${type} (15s)`;
       this.invulnerable = true;
       this.invulnerableTime = 15000; // 15 seconds
+    } 
+    else if (type === 'Laser') {
+      this.powerupTime = 15000; // 15 seconds
+      powerupIndicator.textContent = `${type} (15s)`;
     }
+    else if (type === 'Bomb') {
+      this.powerupTime = 30000; // 30 seconds to use it
+      this.bombReady = true;
+      powerupIndicator.textContent = `${type} (Press SPACE)`;
+    }
+    else if (type === 'Clones') {
+      this.powerupTime = 20000; // 20 seconds
+      powerupIndicator.textContent = `${type} (20s)`;
+      this.spawnClones();
+    }
+  }
+  
+  spawnClones() {
+    // Remove any existing clones
+    clones = clones.filter(clone => !clone.isClone);
+    
+    // Create 3 clones with different offsets
+    const offsetConfigs = [
+      { x: -80, y: -80 },
+      { x: 0, y: -100 },
+      { x: 80, y: -80 }
+    ];
+    
+    for (let i = 0; i < 3; i++) {
+      const clone = new Player(this.x, this.y, true);
+      clone.cloneOffset = offsetConfigs[i];
+      clone.powerupTime = 20000;
+      clones.push(clone);
+      
+      // Create spawn effect particles
+      for (let j = 0; j < 15; j++) {
+        particles.push(new Particle(
+          clone.x, clone.y,
+          (Math.random() - 0.5) * 5,
+          (Math.random() - 0.5) * 5,
+          Math.random() * 10 + 5,
+          'rgba(0, 100, 255, 0.8)'
+        ));
+      }
+    }
+  }
+  
+  activateBomb() {
+    // Create bomb effect - 360-degree attack
+    const numBullets = 36; // One bullet every 10 degrees
+    const bulletSpeed = 12;
+    
+    // Create explosion effect at player position
+    for (let i = 0; i < 60; i++) {
+      particles.push(new Particle(
+        this.x, this.y,
+        (Math.random() - 0.5) * 10,
+        (Math.random() - 0.5) * 10,
+        Math.random() * 20 + 10,
+        'rgba(252, 165, 165, 0.8)'
+      ));
+    }
+    
+    // Create ring of bullets
+    for (let i = 0; i < numBullets; i++) {
+      const angle = (i / numBullets) * Math.PI * 2;
+      bullets.push(new Bullet(
+        this.x,
+        this.y,
+        bulletSpeed * Math.cos(angle),
+        bulletSpeed * Math.sin(angle),
+        8,
+        'magenta'
+      ));
+    }
+    
+    // Apply damage to all nearby enemies and asteroids
+    const bombRadius = 200;
+    
+    // Check asteroids in radius
+    for (const asteroid of asteroids) {
+      const dx = asteroid.x - this.x;
+      const dy = asteroid.y - this.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      
+      if (dist < bombRadius) {
+        asteroid.takeDamage();
+        asteroid.takeDamage(); // Apply double damage
+      }
+    }
+    
+    // Check enemies in radius
+    for (const enemy of enemies) {
+      const dx = enemy.x - this.x;
+      const dy = enemy.y - this.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      
+      if (dist < bombRadius) {
+        enemy.takeDamage();
+        enemy.takeDamage(); // Apply double damage
+      }
+    }
+    
+    // Reset bomb state and power-up
+    this.powerup = null;
+    powerupIndicator.textContent = '';
   }
 }
 
@@ -487,10 +657,10 @@ class Asteroid extends Entity {
       const healthPercent = this.health / this.maxHealth;
       const barWidth = this.radius * 2;
       
-      ctx.fillStyle = 'rgba(255, 0, 0, 0.7)';
+      ctx.fillStyle = 'rgba(185, 28, 28, 0.7)';
       ctx.fillRect(-barWidth/2, this.radius + 5, barWidth, 5);
       
-      ctx.fillStyle = 'rgba(0, 255, 0, 0.7)';
+      ctx.fillStyle = 'rgba(21, 128, 61, 0.7)';
       ctx.fillRect(-barWidth/2, this.radius + 5, barWidth * healthPercent, 5);
     }
     
@@ -525,7 +695,7 @@ class Asteroid extends Entity {
           (Math.random() - 0.5) * 5,
           (Math.random() - 0.5) * 5,
           Math.random() * 10 + 5,
-          'rgba(200, 200, 100, 0.8)'
+          'rgba(216, 216, 216, 0.8)'
         ));
       }
     }
@@ -652,7 +822,7 @@ class Enemy extends Entity {
           (Math.random() - 0.5) * 5,
           (Math.random() - 0.5) * 5,
           Math.random() * 10 + 5,
-          'rgba(255, 100, 100, 0.8)'
+          'rgba(212, 212, 216, 0.8)'
         ));
       }
       this.health = 0;
@@ -672,10 +842,10 @@ class Enemy extends Entity {
     const healthPercent = this.health / this.maxHealth;
     const barWidth = this.radius * 2;
     
-    ctx.fillStyle = 'rgba(255, 0, 0, 0.7)';
+    ctx.fillStyle = 'rgba(185, 28, 28, 0.7)';
     ctx.fillRect(-barWidth/2, this.radius + 5, barWidth, 5);
     
-    ctx.fillStyle = 'rgba(0, 255, 0, 0.7)';
+    ctx.fillStyle = 'rgba(21, 128, 61, 0.7)';
     ctx.fillRect(-barWidth/2, this.radius + 5, barWidth * healthPercent, 5);
     
     ctx.drawImage(this.image, -this.radius, -this.radius, this.radius * 2, this.radius * 2);
@@ -709,13 +879,13 @@ class Enemy extends Entity {
           (Math.random() - 0.5) * 7,
           (Math.random() - 0.5) * 7,
           Math.random() * 15 + 5,
-          'rgba(255, 100, 0, 0.8)'
+          'rgba(212, 212, 216, 0.8)'
         ));
       }
       
       // Chance to drop powerup
-      if (Math.random() < 0.3) {
-        const powerupTypes = ['Laser', 'Shield'];
+      if (Math.random() < 0.5) {
+        const powerupTypes = ['Laser', 'Shield', 'Bomb', 'Clones'];
         const randomType = powerupTypes[Math.floor(Math.random() * powerupTypes.length)];
         powerups.push(new Powerup(this.x, this.y, randomType));
       }
@@ -740,13 +910,6 @@ class Satellite extends Entity {
   update(deltaTime) {
     this.rotation += this.rotationSpeed;
     
-    // Blink effect
-    this.blinkTimer += deltaTime;
-    if (this.blinkTimer > 500) {
-      this.blinkTimer = 0;
-      this.visible = !this.visible;
-    }
-    
     // Check if player collects
     if (player && this.isColliding(player) && !this.collected) {
       this.collected = true;
@@ -765,7 +928,7 @@ class Satellite extends Entity {
           (Math.random() - 0.5) * 5,
           (Math.random() - 0.5) * 5,
           Math.random() * 10 + 5,
-          'rgba(100, 255, 100, 0.8)'
+          'rgba(34, 197, 94, 0.8)'
         ));
       }
     }
@@ -793,13 +956,14 @@ class Satellite extends Entity {
 }
 
 class Powerup extends Entity {
+
   constructor(x, y, type) {
     super(x, y, 15);
     this.type = type;
     this.rotation = 0;
     this.rotationSpeed = 0.03;
     this.lifespan = 10000; // 10 seconds
-    this.image = type === 'Laser' ? images.powerupLaser : images.powerupShield;
+    
     this.pulseTimer = 0;
     this.pulseSize = 0;
     
@@ -807,7 +971,6 @@ class Powerup extends Entity {
     this.floatTimer = 0;
     this.floatOffset = 0;
   }
-  
   update(deltaTime) {
     this.rotation += this.rotationSpeed;
     this.lifespan -= deltaTime;
@@ -850,14 +1013,22 @@ class Powerup extends Entity {
     ctx.translate(screenPos.x, screenPos.y + this.floatOffset);
     ctx.rotate(this.rotation);
     
-    // Draw glow effect
-    const color = this.type === 'Laser' ? 'rgba(255, 200, 0, 0.3)' : 'rgba(200, 0, 255, 0.3)';
+    // Draw glow effect with color based on powerup type
+    let color;
+    if (this.type === 'Laser') {
+      color = 'rgba(255, 200, 0, 0.3)';
+    } else if (this.type === 'Shield') {
+      color = 'rgba(200, 0, 255, 0.3)';
+    } else if (this.type === 'Bomb') {
+      color = 'rgba(255, 0, 255, 0.3)';
+    } else if (this.type === 'Clones') {
+      color = 'rgba(0, 100, 255, 0.3)';
+    }
+    
     ctx.beginPath();
     ctx.arc(0, 0, 20 + this.pulseSize, 0, Math.PI * 2);
     ctx.fillStyle = color;
     ctx.fill();
-    
-    ctx.drawImage(this.image, -20, -20, 40, 40);
     
     ctx.restore();
     
@@ -869,8 +1040,7 @@ class Powerup extends Entity {
       ctx.arc(screenPos.x, screenPos.y + this.floatOffset, 20, 0, Math.PI * 2);
       ctx.fill();
     }
-  }
-}
+  }}
 
 class Particle extends Entity {
   constructor(x, y, vx, vy, radius, color) {
@@ -1294,6 +1464,7 @@ function resetGame() {
   satellites = [];
   powerups = [];
   particles = [];
+  clones = [];
   
   score = 0;
   gameTime = 0;
@@ -1324,6 +1495,7 @@ function cleanupEntities() {
   satellites = satellites.filter(satellite => !satellite.markedForDeletion);
   powerups = powerups.filter(powerup => !powerup.markedForDeletion);
   particles = particles.filter(particle => !particle.markedForDeletion);
+  clones = clones.filter(clone => clone.powerupTime > 0);
 }
 
 function initialize() {
@@ -1380,6 +1552,7 @@ function gameLoop(timestamp) {
       player.update(deltaTime);
     }
     
+    clones.forEach(clone => clone.update(deltaTime));
     bullets.forEach(bullet => bullet.update(deltaTime));
     asteroids.forEach(asteroid => asteroid.update(deltaTime));
     enemies.forEach(enemy => enemy.update(deltaTime));
@@ -1409,6 +1582,9 @@ function gameLoop(timestamp) {
   asteroids.forEach(asteroid => asteroid.draw());
   bullets.forEach(bullet => bullet.draw());
   enemies.forEach(enemy => enemy.draw());
+  
+  // Draw clones before player so player appears on top
+  clones.forEach(clone => clone.draw());
   
   if (player) {
     player.draw();
