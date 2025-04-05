@@ -383,7 +383,7 @@ class Bullet extends Entity {
       
       // Different trail appearance based on bullet type
       if (this.color === 'red') {
-        ctx.fillStyle = `rgba(255, 50, 50, ${opacity * 0.7})`;
+        ctx.fillStyle = `rgba(200, 240, 255, ${opacity * 0.7})`;
       } else {
         ctx.fillStyle = `rgba(200, 240, 255, ${opacity * 0.7})`;
       }
@@ -406,9 +406,9 @@ class Bullet extends Entity {
     
     let gradientColor;
     if (this.color === 'red') {
-      gradientColor = 'rgba(255, 50, 50, 0.9)';
+      gradientColor = 'rgba(79, 70, 229, 0.9)';
     } else if (this.color === 'white') {
-      gradientColor = 'rgba(200, 240, 255, 0.9)';
+      gradientColor = 'rgba(37, 99, 235, 0.9)';
     } else {
       gradientColor = this.color;
     }
@@ -429,11 +429,11 @@ class Bullet extends Entity {
     const glowGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, bulletWidth * 3);
     
     if (this.color === 'red') {
-      glowGradient.addColorStop(0, 'rgba(255, 100, 50, 0.8)');
-      glowGradient.addColorStop(0.5, 'rgba(255, 50, 20, 0.4)');
+      glowGradient.addColorStop(0, 'rgba(99, 102, 241, 0.8)');
+      glowGradient.addColorStop(0.5, 'rgba(67, 56, 202, 0.4)');
     } else {
-      glowGradient.addColorStop(0, 'rgba(200, 240, 255, 0.8)');
-      glowGradient.addColorStop(0.5, 'rgba(100, 200, 255, 0.4)');
+      glowGradient.addColorStop(0, 'rgba(59, 130, 246, 0.8)');
+      glowGradient.addColorStop(0.5, 'rgba(29, 78, 216, 0.4)');
     }
     
     glowGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
