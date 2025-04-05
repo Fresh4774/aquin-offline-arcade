@@ -916,7 +916,7 @@ function updateDifficulty() {
   if (difficultyLevel > oldLevel) {
     // Show level up message
     const levelUpMsg = document.createElement('div');
-    levelUpMsg.textContent = `DIFFICULTY LEVEL ${difficultyLevel}`;
+    levelUpMsg.textContent = `Wave ${difficultyLevel}`;
     levelUpMsg.style.position = 'fixed';
     levelUpMsg.style.top = '50%';
     levelUpMsg.style.left = '50%';
@@ -1207,7 +1207,7 @@ function drawMinimap() {
 function gameOver() {
   gameRunning = false;
   gameOverScreen.style.display = 'block';
-  finalScoreElement.textContent = `Final Score: ${score}`;
+  finalScoreElement.textContent = `Score: ${score}`;
 }
 
 function resetGame() {

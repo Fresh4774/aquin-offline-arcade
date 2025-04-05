@@ -25,7 +25,7 @@ html, body {
   #health {
     height: 20px;
     width: 200px;
-    background: rgba(255, 255, 255, 0.3);
+    background: rgba(239, 68, 68, 0.3);
     border-radius: 10px;
     margin-bottom: 10px;
   }
@@ -33,7 +33,7 @@ html, body {
   #healthBar {
     height: 100%;
     width: 100%;
-    background: linear-gradient(to right, #ff0000, #ff6600);
+    background: linear-gradient(to right, #15803d, #4ade80);
     border-radius: 10px;
     transition: width 0.3s;
   }
@@ -53,7 +53,7 @@ html, body {
   }
   
   #restartBtn {
-    background: #ff6600;
+    background: #27272a;
     border: none;
     color: white;
     padding: 10px 20px;
@@ -61,4 +61,8 @@ html, body {
     border-radius: 5px;
     cursor: pointer;
     margin-top: 20px;
+  }
+
+  #finalScore {
+    font-size: 28px;
   }
