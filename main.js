@@ -146,11 +146,12 @@ class Player extends Entity {
     this.isClone = isClone;
     this.cloneOffset = { x: 0, y: 0 };
     this.bombReady = false;
+    this.bombUses = 0; // Track bomb uses
   }
   
   update(deltaTime) {
     if (this.isClone) {
-      // Clone behavior - follow the player with offset
+      // Clone behavior - actively follow the player with offset and potentially despawn
       if (player) {
         // Calculate target position based on player position and offset
         const targetX = player.x + this.cloneOffset.x;
@@ -160,6 +161,12 @@ class Player extends Entity {
         const dx = targetX - this.x;
         const dy = targetY - this.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        // Check if too far from main player and remove the clone
+        if (dist > 300) {
+          this.markedForDeletion = true;
+          return;
+        }
         
         if (dist > 5) {
           this.velocity.x = dx * 0.1;
@@ -208,10 +215,22 @@ class Player extends Entity {
         this.velocity.y += Math.sin(this.rotation + Math.PI/2) * this.acceleration * 0.7;
       }
       
-      // Activate bomb if space key is pressed and bomb is ready
-      if (keys[' '] && this.bombReady) {
+      // Activate bomb on right-click if bomb is ready
+      if ((keys[' ']) && this.bombReady && this.bombUses > 0) {
         this.activateBomb();
-        this.bombReady = false;
+        this.bombUses--;
+        
+        // Update bomb indicator
+        if (!this.isClone) {
+          powerupIndicator.textContent = this.bombUses > 0 ? 
+            `Bomb (${this.bombUses} uses)` : 'No bombs left';
+        }
+        
+        // Clear bomb if no uses left
+        if (this.bombUses <= 0) {
+          this.bombReady = false;
+          this.powerup = null;
+        }
       }
     }
     
@@ -248,11 +267,17 @@ class Player extends Entity {
       this.powerupTime -= deltaTime;
       if (!this.isClone) {
         if (this.powerup === "Bomb") {
-          powerupIndicator.textContent = `${this.powerup} (Press SPACE)`;
+          powerupIndicator.textContent = `${this.powerup} (${this.bombUses} uses)`;
         } else {
           powerupIndicator.textContent = `${this.powerup} (${Math.ceil(this.powerupTime / 1000)}s)`;
         }
       }
+      
+      // Clear clones if Clone powerup expires
+      if (this.powerup === 'Clones' && this.powerupTime <= 0) {
+        clones = clones.filter(clone => clone.powerupTime > 0);
+      }
+      
       if (this.powerupTime <= 0) {
         this.powerup = null;
         if (!this.isClone) {
@@ -272,7 +297,7 @@ class Player extends Entity {
     if (this.invulnerable) {
       ctx.beginPath();
       ctx.arc(0, 0, this.radius + 5, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(0, 255, 255, 0.7)';
+      ctx.strokeStyle = 'rgba(216, 216, 216, 0.7)';
       ctx.lineWidth = 3;
       ctx.stroke();
     }
@@ -283,22 +308,22 @@ class Player extends Entity {
     
     // Power-up visual effects
     if (this.powerup === 'Laser') {
-      ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
+      ctx.fillStyle = 'rgba(59, 130, 246, 0.3)';
       ctx.beginPath();
       ctx.arc(0, 0, this.radius + 8, 0, Math.PI * 2);
       ctx.fill();
     } else if (this.powerup === 'Shield') {
-      ctx.fillStyle = 'rgba(0, 255, 255, 0.3)';
+      ctx.fillStyle = 'rgba(34, 197, 94, 0.3)';
       ctx.beginPath();
       ctx.arc(0, 0, this.radius + 8, 0, Math.PI * 2);
       ctx.fill();
     } else if (this.powerup === 'Bomb') {
-      ctx.fillStyle = 'rgba(255, 0, 255, 0.3)';
+      ctx.fillStyle = 'rgba(239, 68, 68, 0.3)';
       ctx.beginPath();
       ctx.arc(0, 0, this.radius + 8, 0, Math.PI * 2);
       ctx.fill();
     } else if (this.powerup === 'Clones') {
-      ctx.fillStyle = 'rgba(0, 100, 255, 0.3)';
+      ctx.fillStyle = 'rgba(20, 184, 166, 0.3)';
       ctx.beginPath();
       ctx.arc(0, 0, this.radius + 8, 0, Math.PI * 2);
       ctx.fill();
@@ -329,7 +354,7 @@ class Player extends Entity {
             bulletSpeed * Math.cos(adjustedRotation),
             bulletSpeed * Math.sin(adjustedRotation),
             10,
-            'red'
+            'white'
           ));
         }
         this.shootCooldown = 150; // 0.15 seconds
@@ -376,6 +401,19 @@ class Player extends Entity {
   }
   
   applyPowerup(type) {
+    // Remove existing powerup effects
+    if (this.powerup === 'Clones') {
+      // Remove existing clones
+      clones = clones.filter(clone => !clone.isClone);
+    }
+    
+    // Reset previous powerup state
+    if (this.powerup === 'Shield') {
+      this.invulnerable = false;
+      this.invulnerableTime = 0;
+    }
+    
+    // Set new powerup
     this.powerup = type;
     
     if (type === 'Shield') {
@@ -391,11 +429,12 @@ class Player extends Entity {
     else if (type === 'Bomb') {
       this.powerupTime = 30000; // 30 seconds to use it
       this.bombReady = true;
-      powerupIndicator.textContent = `${type} (Press SPACE)`;
+      this.bombUses = 5; // Allow 5 bomb uses
+      powerupIndicator.textContent = `Bomb (5 uses)`;
     }
     else if (type === 'Clones') {
-      this.powerupTime = 20000; // 20 seconds
-      powerupIndicator.textContent = `${type} (20s)`;
+      this.powerupTime = 15000; // 20 seconds
+      powerupIndicator.textContent = `${type} (15s)`;
       this.spawnClones();
     }
   }
@@ -455,7 +494,7 @@ class Player extends Entity {
         bulletSpeed * Math.cos(angle),
         bulletSpeed * Math.sin(angle),
         8,
-        'magenta'
+        'white'
       ));
     }
     
@@ -485,10 +524,6 @@ class Player extends Entity {
         enemy.takeDamage(); // Apply double damage
       }
     }
-    
-    // Reset bomb state and power-up
-    this.powerup = null;
-    powerupIndicator.textContent = '';
   }
 }
 
@@ -1180,7 +1215,7 @@ function updateDifficulty() {
 }
 
 function checkCollisions() {
-  // Check bullet collisions with asteroids
+  // Check bullet collisions with asteroids and enemies
   for (let i = bullets.length - 1; i >= 0; i--) {
     const bullet = bullets[i];
     
@@ -1201,6 +1236,23 @@ function checkCollisions() {
         enemy.takeDamage();
         bullet.markedForDeletion = true;
         break;
+      }
+    }
+    
+    // Check player bullet collision (optional - for enemy bullets that are red)
+    if (player && bullet.color === 'red' && player.isColliding(bullet) && !player.invulnerable) {
+      player.takeDamage(5); // Enemies always do 5 damage
+      bullet.markedForDeletion = true;
+      
+      // Create hit particles
+      for (let k = 0; k < 10; k++) {
+        particles.push(new Particle(
+          bullet.x, bullet.y,
+          (Math.random() - 0.5) * 5,
+          (Math.random() - 0.5) * 5,
+          Math.random() * 8 + 3,
+          'rgba(216, 216, 216, 0.8)'
+        ));
       }
     }
   }
