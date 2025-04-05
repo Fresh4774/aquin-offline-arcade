@@ -51,6 +51,10 @@ html, body {
     border-radius: 10px;
     display: none;
   }
+
+  #time {
+    display: none;
+  }
   
   #restartBtn {
     background: #27272a;
