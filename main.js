@@ -79,11 +79,43 @@ const keys = {};
 const mousePos = { x: 0, y: 0 };
 
 window.addEventListener('keydown', (e) => {
-  keys[e.key.toLowerCase()] = true;
+  // Normalize key names to lowercase and handle arrow keys
+  let key = e.key.toLowerCase();
+  
+  // Map arrow keys to WASD equivalents
+  const keyMap = {
+    'arrowup': 'w',
+    'arrowdown': 's',
+    'arrowleft': 'a',
+    'arrowright': 'd'
+  };
+  
+  // If it's an arrow key, use the mapped WASD key
+  if (keyMap[key]) {
+    key = keyMap[key];
+  }
+  
+  keys[key] = true;
 });
 
 window.addEventListener('keyup', (e) => {
-  keys[e.key.toLowerCase()] = false;
+  // Normalize key names to lowercase and handle arrow keys
+  let key = e.key.toLowerCase();
+  
+  // Map arrow keys to WASD equivalents
+  const keyMap = {
+    'arrowup': 'w',
+    'arrowdown': 's',
+    'arrowleft': 'a',
+    'arrowright': 'd'
+  };
+  
+  // If it's an arrow key, use the mapped WASD key
+  if (keyMap[key]) {
+    key = keyMap[key];
+  }
+  
+  keys[key] = false;
 });
 
 canvas.addEventListener('mousemove', (e) => {
@@ -1204,7 +1236,8 @@ function updateDifficulty() {
     levelUpMsg.style.color = 'red';
     levelUpMsg.style.fontSize = '48px';
     levelUpMsg.style.fontWeight = 'bold';
-    levelUpMsg.style.textShadow = '0 0 10px rgba(255, 0, 0, 0.7)';
+    levelUpMsg.style.color = 'rgba(250, 250, 250, 0.7)';
+    levelUpMsg.style.background = 'rgba(24, 24, 27, 0.3)';
     levelUpMsg.style.zIndex = '1000';
     document.body.appendChild(levelUpMsg);
     
